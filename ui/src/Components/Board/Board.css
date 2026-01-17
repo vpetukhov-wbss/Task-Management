@@ -1,0 +1,131 @@
+.board {
+  min-width: 290px;
+  width: 290px;
+  height: 100%;
+  overflow-y: auto;
+  flex-basis: 290px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  color: #2c3e50;
+}
+
+.board-inner {
+  background-color: #ffffff;
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.board-inner:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+.board-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 5px;
+}
+
+.board-header-title {
+  font-weight: bold;
+  font-size: 1rem;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.board-header-title span {
+  color: rgb(145, 145, 145);
+}
+
+.board-header-title-more {
+  cursor: pointer;
+  position: relative;
+}
+
+.board-dropdown {
+  box-shadow: rgba(0, 0, 0, 0.25) 0px 54px 55px, rgba(0, 0, 0, 0.12) 0px -12px 30px, rgba(0, 0, 0, 0.12) 0px 4px 6px, rgba(0, 0, 0, 0.17) 0px 12px 13px, rgba(0, 0, 0, 0.09) 0px -3px 5px;
+  padding: 10px;
+  width: 150px !important;
+  cursor: default;
+}
+.board-dropdown p {
+  border-bottom: 1px solid #f8f8f8;
+  cursor: pointer;
+  padding: 8px 5px;
+  margin: 0;
+  transition: background-color 0.2s ease;
+}
+.board-dropdown p:hover {
+  background-color: #f0f0f0;
+}
+.board-dropdown p:last-child {
+  border-bottom: none;
+}
+
+.board-header-title-edit {
+  flex: 1;
+}
+
+.board-header-title-edit-input {
+  background-color: #fff;
+  border-radius: 5px;
+  padding: 5px;
+}
+
+.board-header-title-edit-input input {
+  width: 100%;
+  padding: 5px;
+  border: 2px solid #0079bf;
+  border-radius: 3px;
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.board-header-title-edit-input button {
+  margin-top: 5px;
+  padding: 5px 15px;
+  background-color: #0079bf;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.board-header-title-edit-input button:hover {
+  background-color: #026aa7;
+}
+
+.board-cards {
+  background-color: #f8f9fa;
+  padding: 10px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.board-add-card {
+  background-color: #fff;
+  color: #2c3e50;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.board-add-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.board-add-card-edit {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
