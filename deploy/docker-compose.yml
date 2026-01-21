@@ -1,0 +1,219 @@
+services:
+  # ============================================
+  # SQL Server Database
+  # ============================================
+  mssql:
+    container_name: taskmanagement-mssql
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      - ACCEPT_EULA=${ACCEPT_EULA:-Y}
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD:-YourStrong!Passw0rd}
+      - MSSQL_PID=${MSSQL_PID:-Developer}
+    ports:
+      - "1434:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    networks:
+      - taskmanager-network
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ${MSSQL_SA_PASSWORD:-YourStrong!Passw0rd} -Q "SELECT 1" -C || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '${DB_CPU_LIMIT:-2}'
+          memory: ${DB_MEMORY_LIMIT:-4g}
+        reservations:
+          cpus: '${DB_CPU_RESERVATION:-1}'
+          memory: ${DB_MEMORY_RESERVATION:-1g}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: "${LOG_MAX_FILES:-3}"
+
+  # ============================================
+  # .NET API Backend
+  # ============================================
+  api:
+    container_name: taskmanagement-api
+    build:
+      context: ../api
+      dockerfile: Dockerfile
+      args:
+        BUILD_CONFIGURATION: Release
+    ports:
+      - "${API_PORT:-5000}:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__SqlServer=Server=mssql;Database=${DB_NAME:-TaskManagementSystem};User Id=sa;Password=${MSSQL_SA_PASSWORD:-YourStrong!Passw0rd};TrustServerCertificate=True;MultipleActiveResultSets=true
+      - AuthConfiguration__Key=${JWT_SECRET_KEY:-your_secret_key_here_change_it_please_make_it_longer_than_32_characters}
+      - AuthConfiguration__Issuer=${JWT_ISSUER:-TaskManagementSystem}
+      - AuthConfiguration__Audience=${JWT_AUDIENCE:-TaskManagementSystem}
+      - CorsConfiguration__AllowedOrigins__0=${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4318}
+      - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
+      - Serilog__WriteTo__1__Args__serverUrl=http://seq:${SEQ_INGESTION_PORT:-5341}
+      - Serilog__WriteTo__1__Args__apiKey=${SEQ_API_KEY:-abcde12345}
+    depends_on:
+      mssql:
+        condition: service_healthy
+    networks:
+      - taskmanager-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+    deploy:
+      replicas: ${API_REPLICAS:-1}
+      resources:
+        limits:
+          cpus: '${API_CPU_LIMIT:-2}'
+          memory: ${API_MEMORY_LIMIT:-2g}
+        reservations:
+          cpus: '${API_CPU_RESERVATION:-1}'
+          memory: ${API_MEMORY_RESERVATION:-512m}
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: "${LOG_MAX_FILES:-5}"
+
+  # ============================================
+  # React UI Frontend
+  # ============================================
+  ui:
+    container_name: taskmanagement-ui
+    build:
+      context: ../ui
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:5000/api}
+    ports:
+      - "${UI_PORT:-3000}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - taskmanager-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '${UI_CPU_LIMIT:-1}'
+          memory: ${UI_MEMORY_LIMIT:-512m}
+        reservations:
+          cpus: '${UI_CPU_RESERVATION:-0.5}'
+          memory: ${UI_MEMORY_RESERVATION:-128m}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: "${LOG_MAX_FILES:-3}"
+
+  # ============================================
+  # Seq - Structured Logging
+  # ============================================
+  seq:
+    container_name: taskmanagement-seq
+    image: datalust/seq:2024.3
+    environment:
+      - ACCEPT_EULA=Y
+      - SEQ_FIRSTRUN_ADMINPASSWORDHASH=${SEQ_ADMIN_PASSWORD_HASH}
+    volumes:
+      - seq-data:/data
+    ports:
+      - "${SEQ_INGESTION_PORT:-5341}:5341"
+      - "${SEQ_PORT:-8081}:80"
+    networks:
+      - taskmanager-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1g
+        reservations:
+          memory: 256m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: "${LOG_MAX_FILES:-3}"
+
+  # ============================================
+  # Jaeger - Distributed Tracing
+  # ============================================
+  jaeger:
+    container_name: taskmanagement-jaeger
+    image: jaegertracing/all-in-one:latest
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - SPAN_STORAGE_TYPE=${JAEGER_SPAN_STORAGE_TYPE:-memory}
+      - BADGER_EPHEMERAL=false
+      - BADGER_DIRECTORY_VALUE=/badger/data
+      - BADGER_DIRECTORY_KEY=/badger/key
+    volumes:
+      - jaeger-data:/badger
+    ports:
+      - "${JAEGER_OTLP_GRPC_PORT:-4317}:4317"
+      - "${JAEGER_OTLP_HTTP_PORT:-4318}:4318"
+      - "${JAEGER_UI_PORT:-16686}:16686"
+    networks:
+      - taskmanager-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:14269"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1g
+        reservations:
+          memory: 256m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: "${LOG_MAX_FILES:-3}"
+
+networks:
+  taskmanager-network:
+    driver: bridge
+
+volumes:
+  mssql-data:
+    driver: local
+  seq-data:
+    driver: local
+  jaeger-data:
+    driver: local
